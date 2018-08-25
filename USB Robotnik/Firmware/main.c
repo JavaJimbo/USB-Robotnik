@@ -1,18 +1,18 @@
-/********************************************************************
+/**********************************************************************************
  * FileName: main.c Adapted from Microchip CDC serial emulator
  * Compiled for PIC32MX795 XC32 compiler version 1.30
  * 
  * Jim Sedgwick 7-29-18   
  * Separated UART and USB buffers.
  * 8-24-18: Implemented simple USB-UART bridge.
- *******************************************************************/
-
-/** INCLUDES *******************************************************/
-
+ * 8-25-18: Combined SD card writes and reads accepting data from both UART and USB
+ ***********************************************************************************/
+#include <xc.h>
 #include "./USB/usb.h"
 #include "./USB/usb_function_cdc.h"
 #include "HardwareProfile.h"
 #include "./uart2.h"
+#include "Delay.h"
 
 /** CONFIGURATION **************************************************/
 #pragma config UPLLEN   = ON        // USB PLL Enabled
@@ -42,7 +42,11 @@
 #include "USB/usb_device.h"
 #include "USB/usb.h"
 #include "HardwareProfile.h"
-#include "Definitions.h"
+
+#include "FSIO.h"
+#include "Delay.h"
+#include "Defs.h"
+
 
 // UART FOR PC SERIAL PORT
 #define HOSTuart UART2
@@ -56,12 +60,17 @@
 #define false FALSE
 #define true TRUE
 /** V A R I A B L E S ********************************************************/
-char USBReceivedData[CDC_DATA_IN_EP_SIZE];
-
-unsigned char HOSTRxBuffer[MAX_RX_BUFFERSIZE];
+#define MAXBUFFER CDC_DATA_IN_EP_SIZE
+char USBReceivedData[MAXBUFFER];
+char USBRXBuffer[MAXBUFFER];
+unsigned char HOSTRxBuffer[MAXBUFFER];
 unsigned char HOSTRxBufferFull = false;
-unsigned char HOSTTxBuffer[MAX_TX_BUFFERSIZE];
+unsigned char MemoryBufferFull = false;
+unsigned char HOSTTxBuffer[MAXBUFFER];
 unsigned char HOSTTxBufferFull = false;
+unsigned char tempBuffer[MAXBUFFER];
+unsigned char MemoryBuffer[MAXBUFFER];
+
 
 //BOOL stringPrinted;
 
@@ -81,8 +90,44 @@ unsigned char getcUSART ();
 
 int main(void)
 {   
+unsigned short i=0, numBytes;
+FSFILE *filePtr;
+char filename[] = "TestFile.txt";
+int length;
+char ch;
+    
+    InitializeSystem();    
+
     InitializeSystem();
-    printf("\rUSB-UART BRIDGE AT 57600 BAUD");
+    DelayMs(100);
+    
+#ifdef USE_UBW32    
+    printf("\r\r\rSTARTING SD card demo for UBW32 board");
+#else     
+    printf("\r\r\rSTARTING SD card demo for SNAD PIC board");
+#endif
+    printf("\rWait for Media Detect...");
+    while (!MDD_MediaDetect());     // Wait for SD detect to go low    
+    printf("\rInitializing SD card...");
+    while (!FSInit());
+    printf("\rOpening test file...");
+    filePtr = FSfopen(filename, FS_READ);            
+    if (filePtr==NULL) printf("Error: could not open %s", filename);
+    else
+    {
+        printf("\rSuccess! Opened %s. Reading data\r", filename);    
+        do {           
+            numBytes = FSfread(&ch, 1, 1, filePtr);
+            putchar(ch);
+        } while (numBytes);    
+        printf("\rClosing file");
+        FSfclose(filePtr); 
+        printf("\rDONE");        
+    }
+    DelayMs(10);        // Initialize SD card    
+    
+    
+    printf("\rTESTING WITH MEMORY BUFFER");
 
     #if defined(USB_INTERRUPT)
         USBDeviceAttach();
@@ -90,6 +135,21 @@ int main(void)
 
     while(1)
     {
+        DelayMs(1);    
+        if (MemoryBufferFull)
+        {
+            MemoryBufferFull = false;        
+            printf("\rOpening %s to append...", filename);
+            filePtr = FSfopen(filename, FS_APPEND);
+            length = strlen(MemoryBuffer);
+            printf("\rWriting %d bytes...", length);        
+            numBytes = FSfwrite(MemoryBuffer, 1, length, filePtr);
+            MemoryBuffer[0] = '\0';
+            printf("\r%d bytes written", numBytes);
+            FSfclose(filePtr); 
+            printf("\rDONE");            
+        }                
+
         #if defined(USB_POLLING)
 		// Check bus status and service USB interrupts.
         USBDeviceTasks();
@@ -302,6 +362,7 @@ BOOL USER_USB_CALLBACK_EVENT_HANDLER(int event, void *pdata, WORD size)
 void __ISR(HOST_VECTOR, ipl2) IntHostUartHandler(void) {
     unsigned char ch;
     static unsigned short HOSTRxIndex = 0;
+    int i;
 
     if (HOSTbits.OERR || HOSTbits.FERR) {
         if (UARTReceivedDataIsAvailable(HOSTuart))
@@ -322,14 +383,21 @@ void __ISR(HOST_VECTOR, ipl2) IntHostUartHandler(void) {
                 UARTSendDataByte(HOSTuart, BACKSPACE);
                 if (HOSTRxIndex > 0) HOSTRxIndex--;
             } else if (ch == CR) {
-                if (HOSTRxIndex < (MAX_RX_BUFFERSIZE - 1)) {
+                if (HOSTRxIndex < (MAXBUFFER-1)) {
                     HOSTRxBuffer[HOSTRxIndex] = CR;
                     HOSTRxBuffer[HOSTRxIndex + 1] = '\0'; 
                     HOSTRxBufferFull = true;
+                    for (i = 0; i < MAXBUFFER; i++)
+                    {
+                        ch = HOSTRxBuffer[i];
+                        MemoryBuffer[i] = ch;
+                        if (ch == '\0') break;
+                    }
+                    MemoryBufferFull = true;
                 }
                 HOSTRxIndex = 0;
             }                
-            else if (HOSTRxIndex < MAX_RX_BUFFERSIZE)
+            else if (HOSTRxIndex < (MAXBUFFER-1))
                 HOSTRxBuffer[HOSTRxIndex++] = ch;
         }
     }
@@ -394,7 +462,9 @@ void InitializeSystem(void)
 
 void ProcessIO(void)
 {   
-    static int bytesReceived = 0;                    
+    static int bytesReceived = 0;     
+    int length, i;
+    unsigned char ch;   
     
     //Blink the LEDs according to the USB device status
     BlinkUSBStatus();
@@ -403,17 +473,24 @@ void ProcessIO(void)
 
     if (!HOSTTxBufferFull)
     {
-        bytesReceived = getsUSBUSART(USBReceivedData,64); //until the buffer is free.        
+        bytesReceived = getsUSBUSART(USBReceivedData, MAXBUFFER); //until the buffer is free.        
         if (bytesReceived > 0)
         {	            
-            USBReceivedData[bytesReceived] = '\0';
-            strcat(HOSTTxBuffer, USBReceivedData);			
+            if (bytesReceived == MAXBUFFER) bytesReceived = MAXBUFFER-1;
+            USBReceivedData[bytesReceived] = '\0';            
+            length = strlen(HOSTTxBuffer) + bytesReceived;
+            if (length <= MAXBUFFER) strcat(HOSTTxBuffer, USBReceivedData);			
             if (strchr(USBReceivedData, '\r')) 
-            {       
-                HOSTTxBufferFull = true;
-                //printf("USB RX: %s", HOSTTxBuffer);
-                //HOSTTxBuffer[0] = '\0';
-            }            
+            {
+                HOSTTxBufferFull = true;                        
+                for (i = 0; i < MAXBUFFER; i++)
+                {
+                    ch = HOSTTxBuffer[i];
+                    MemoryBuffer[i] = ch;
+                    if (ch == '\0') break;
+                }
+                MemoryBufferFull = true;        
+            }                
         }	
     }
 
@@ -423,8 +500,17 @@ void ProcessIO(void)
     if (USBUSARTIsTxTrfReady() && HOSTRxBufferFull)
 	{        
         HOSTRxBufferFull = false;
-        int length = strlen(HOSTRxBuffer); 
-        putUSBUSART(HOSTRxBuffer, length);        		
+        length = strlen(HOSTRxBuffer);         
+        
+        if (length < (MAXBUFFER-6))
+        {
+            strcpy (tempBuffer, "UART: ");
+            strcat (tempBuffer, HOSTRxBuffer);
+            strcpy (HOSTRxBuffer, tempBuffer);
+            length = strlen(HOSTRxBuffer); 
+            putUSBUSART(HOSTRxBuffer, length);        		
+        }               
+        else putUSBUSART("ERROR\r", 6);
 	}
     
     CDCTxService();

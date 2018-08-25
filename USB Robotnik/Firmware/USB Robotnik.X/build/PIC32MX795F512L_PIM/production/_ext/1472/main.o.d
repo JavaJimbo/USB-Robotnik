@@ -14,5 +14,10 @@ build/PIC32MX795F512L_PIM/production/_ext/1472/main.o:  \
 ../HardwareProfile.h  \
  ../HardwareProfile\ -\ PIC32MX795F512L\ PIM.h  \
  ../../Microchip/Include/./uart2.h  \
+../Delay.h  \
 ../usb_config.h  \
-../Definitions.h 
+../FSIO.h  \
+ ../FSconfig.h  \
+../Defs.h  \
+../FSDefs.h  \
+../SD-SPI.h 

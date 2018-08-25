@@ -15,6 +15,12 @@
       </logicalFolder>
       <itemPath>../HardwareProfile.h</itemPath>
       <itemPath>../usb_config.h</itemPath>
+      <itemPath>../Defs.h</itemPath>
+      <itemPath>../FSDefs.h</itemPath>
+      <itemPath>../FSIO.h</itemPath>
+      <itemPath>../FSconfig.h</itemPath>
+      <itemPath>../SD-SPI.h</itemPath>
+      <itemPath>../Delay.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LibraryFiles"
                    displayName="Library Files"
@@ -41,6 +47,9 @@
       </logicalFolder>
       <itemPath>../main.c</itemPath>
       <itemPath>../usb_descriptors.c</itemPath>
+      <itemPath>../FSIO.c</itemPath>
+      <itemPath>../SD-SPI.c</itemPath>
+      <itemPath>../DelayPIC32.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
@@ -52,6 +61,7 @@
     <Elem>../../Microchip/Common</Elem>
     <Elem>../../Microchip/USB</Elem>
     <Elem>../../Microchip/Include</Elem>
+    <Elem>..</Elem>
   </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
@@ -2755,6 +2765,7 @@
         <property key="UART6" value="true"/>
         <property key="USB" value="true"/>
         <property key="debugoptions.useswbreakpoints" value="false"/>
+        <property key="firmware.download.all" value="false"/>
         <property key="hwtoolclock.frcindebug" value="false"/>
         <property key="memories.aux" value="false"/>
         <property key="memories.bootflash" value="false"/>

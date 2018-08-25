@@ -57,17 +57,17 @@ OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
 # Source Files Quoted if spaced
-SOURCEFILES_QUOTED_IF_SPACED=../../Microchip/Common/uart2.c ../../Microchip/USB/usb_device.c ../../Microchip/USB/usb_hal_pic24.c "../../Microchip/USB/CDC Device Driver/usb_function_cdc.c" ../main.c ../usb_descriptors.c
+SOURCEFILES_QUOTED_IF_SPACED=../../Microchip/Common/uart2.c ../../Microchip/USB/usb_device.c ../../Microchip/USB/usb_hal_pic24.c "../../Microchip/USB/CDC Device Driver/usb_function_cdc.c" ../main.c ../usb_descriptors.c ../FSIO.c ../SD-SPI.c ../DelayPIC32.c
 
 # Object Files Quoted if spaced
-OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/_ext/385479254/uart2.o ${OBJECTDIR}/_ext/713068069/usb_device.o ${OBJECTDIR}/_ext/713068069/usb_hal_pic24.o ${OBJECTDIR}/_ext/1166020650/usb_function_cdc.o ${OBJECTDIR}/_ext/1472/main.o ${OBJECTDIR}/_ext/1472/usb_descriptors.o
-POSSIBLE_DEPFILES=${OBJECTDIR}/_ext/385479254/uart2.o.d ${OBJECTDIR}/_ext/713068069/usb_device.o.d ${OBJECTDIR}/_ext/713068069/usb_hal_pic24.o.d ${OBJECTDIR}/_ext/1166020650/usb_function_cdc.o.d ${OBJECTDIR}/_ext/1472/main.o.d ${OBJECTDIR}/_ext/1472/usb_descriptors.o.d
+OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/_ext/385479254/uart2.o ${OBJECTDIR}/_ext/713068069/usb_device.o ${OBJECTDIR}/_ext/713068069/usb_hal_pic24.o ${OBJECTDIR}/_ext/1166020650/usb_function_cdc.o ${OBJECTDIR}/_ext/1472/main.o ${OBJECTDIR}/_ext/1472/usb_descriptors.o ${OBJECTDIR}/_ext/1472/FSIO.o ${OBJECTDIR}/_ext/1472/SD-SPI.o ${OBJECTDIR}/_ext/1472/DelayPIC32.o
+POSSIBLE_DEPFILES=${OBJECTDIR}/_ext/385479254/uart2.o.d ${OBJECTDIR}/_ext/713068069/usb_device.o.d ${OBJECTDIR}/_ext/713068069/usb_hal_pic24.o.d ${OBJECTDIR}/_ext/1166020650/usb_function_cdc.o.d ${OBJECTDIR}/_ext/1472/main.o.d ${OBJECTDIR}/_ext/1472/usb_descriptors.o.d ${OBJECTDIR}/_ext/1472/FSIO.o.d ${OBJECTDIR}/_ext/1472/SD-SPI.o.d ${OBJECTDIR}/_ext/1472/DelayPIC32.o.d
 
 # Object Files
-OBJECTFILES=${OBJECTDIR}/_ext/385479254/uart2.o ${OBJECTDIR}/_ext/713068069/usb_device.o ${OBJECTDIR}/_ext/713068069/usb_hal_pic24.o ${OBJECTDIR}/_ext/1166020650/usb_function_cdc.o ${OBJECTDIR}/_ext/1472/main.o ${OBJECTDIR}/_ext/1472/usb_descriptors.o
+OBJECTFILES=${OBJECTDIR}/_ext/385479254/uart2.o ${OBJECTDIR}/_ext/713068069/usb_device.o ${OBJECTDIR}/_ext/713068069/usb_hal_pic24.o ${OBJECTDIR}/_ext/1166020650/usb_function_cdc.o ${OBJECTDIR}/_ext/1472/main.o ${OBJECTDIR}/_ext/1472/usb_descriptors.o ${OBJECTDIR}/_ext/1472/FSIO.o ${OBJECTDIR}/_ext/1472/SD-SPI.o ${OBJECTDIR}/_ext/1472/DelayPIC32.o
 
 # Source Files
-SOURCEFILES=../../Microchip/Common/uart2.c ../../Microchip/USB/usb_device.c ../../Microchip/USB/usb_hal_pic24.c ../../Microchip/USB/CDC Device Driver/usb_function_cdc.c ../main.c ../usb_descriptors.c
+SOURCEFILES=../../Microchip/Common/uart2.c ../../Microchip/USB/usb_device.c ../../Microchip/USB/usb_hal_pic24.c ../../Microchip/USB/CDC Device Driver/usb_function_cdc.c ../main.c ../usb_descriptors.c ../FSIO.c ../SD-SPI.c ../DelayPIC32.c
 
 
 CFLAGS=
@@ -142,6 +142,24 @@ ${OBJECTDIR}/_ext/1472/usb_descriptors.o: ../usb_descriptors.c  nbproject/Makefi
 	@${RM} ${OBJECTDIR}/_ext/1472/usb_descriptors.o 
 	@${FIXDEPS} "${OBJECTDIR}/_ext/1472/usb_descriptors.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -DICD3PlatformTool=1  -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION) -I"../../../../Microchip/Include" -DPIC32MX795F512L_PIM -I".." -I"../../Microchip/Include" -MMD -MF "${OBJECTDIR}/_ext/1472/usb_descriptors.o.d" -o ${OBJECTDIR}/_ext/1472/usb_descriptors.o ../usb_descriptors.c    -DXPRJ_PIC32MX795F512L_PIM=$(CND_CONF)    $(COMPARISON_BUILD) 
 	
+${OBJECTDIR}/_ext/1472/FSIO.o: ../FSIO.c  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}/_ext/1472" 
+	@${RM} ${OBJECTDIR}/_ext/1472/FSIO.o.d 
+	@${RM} ${OBJECTDIR}/_ext/1472/FSIO.o 
+	@${FIXDEPS} "${OBJECTDIR}/_ext/1472/FSIO.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -DICD3PlatformTool=1  -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION) -I"../../../../Microchip/Include" -DPIC32MX795F512L_PIM -I".." -I"../../Microchip/Include" -MMD -MF "${OBJECTDIR}/_ext/1472/FSIO.o.d" -o ${OBJECTDIR}/_ext/1472/FSIO.o ../FSIO.c    -DXPRJ_PIC32MX795F512L_PIM=$(CND_CONF)    $(COMPARISON_BUILD) 
+	
+${OBJECTDIR}/_ext/1472/SD-SPI.o: ../SD-SPI.c  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}/_ext/1472" 
+	@${RM} ${OBJECTDIR}/_ext/1472/SD-SPI.o.d 
+	@${RM} ${OBJECTDIR}/_ext/1472/SD-SPI.o 
+	@${FIXDEPS} "${OBJECTDIR}/_ext/1472/SD-SPI.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -DICD3PlatformTool=1  -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION) -I"../../../../Microchip/Include" -DPIC32MX795F512L_PIM -I".." -I"../../Microchip/Include" -MMD -MF "${OBJECTDIR}/_ext/1472/SD-SPI.o.d" -o ${OBJECTDIR}/_ext/1472/SD-SPI.o ../SD-SPI.c    -DXPRJ_PIC32MX795F512L_PIM=$(CND_CONF)    $(COMPARISON_BUILD) 
+	
+${OBJECTDIR}/_ext/1472/DelayPIC32.o: ../DelayPIC32.c  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}/_ext/1472" 
+	@${RM} ${OBJECTDIR}/_ext/1472/DelayPIC32.o.d 
+	@${RM} ${OBJECTDIR}/_ext/1472/DelayPIC32.o 
+	@${FIXDEPS} "${OBJECTDIR}/_ext/1472/DelayPIC32.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -DICD3PlatformTool=1  -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION) -I"../../../../Microchip/Include" -DPIC32MX795F512L_PIM -I".." -I"../../Microchip/Include" -MMD -MF "${OBJECTDIR}/_ext/1472/DelayPIC32.o.d" -o ${OBJECTDIR}/_ext/1472/DelayPIC32.o ../DelayPIC32.c    -DXPRJ_PIC32MX795F512L_PIM=$(CND_CONF)    $(COMPARISON_BUILD) 
+	
 else
 ${OBJECTDIR}/_ext/385479254/uart2.o: ../../Microchip/Common/uart2.c  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}/_ext/385479254" 
@@ -178,6 +196,24 @@ ${OBJECTDIR}/_ext/1472/usb_descriptors.o: ../usb_descriptors.c  nbproject/Makefi
 	@${RM} ${OBJECTDIR}/_ext/1472/usb_descriptors.o.d 
 	@${RM} ${OBJECTDIR}/_ext/1472/usb_descriptors.o 
 	@${FIXDEPS} "${OBJECTDIR}/_ext/1472/usb_descriptors.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION) -I"../../../../Microchip/Include" -DPIC32MX795F512L_PIM -I".." -I"../../Microchip/Include" -MMD -MF "${OBJECTDIR}/_ext/1472/usb_descriptors.o.d" -o ${OBJECTDIR}/_ext/1472/usb_descriptors.o ../usb_descriptors.c    -DXPRJ_PIC32MX795F512L_PIM=$(CND_CONF)    $(COMPARISON_BUILD) 
+	
+${OBJECTDIR}/_ext/1472/FSIO.o: ../FSIO.c  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}/_ext/1472" 
+	@${RM} ${OBJECTDIR}/_ext/1472/FSIO.o.d 
+	@${RM} ${OBJECTDIR}/_ext/1472/FSIO.o 
+	@${FIXDEPS} "${OBJECTDIR}/_ext/1472/FSIO.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION) -I"../../../../Microchip/Include" -DPIC32MX795F512L_PIM -I".." -I"../../Microchip/Include" -MMD -MF "${OBJECTDIR}/_ext/1472/FSIO.o.d" -o ${OBJECTDIR}/_ext/1472/FSIO.o ../FSIO.c    -DXPRJ_PIC32MX795F512L_PIM=$(CND_CONF)    $(COMPARISON_BUILD) 
+	
+${OBJECTDIR}/_ext/1472/SD-SPI.o: ../SD-SPI.c  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}/_ext/1472" 
+	@${RM} ${OBJECTDIR}/_ext/1472/SD-SPI.o.d 
+	@${RM} ${OBJECTDIR}/_ext/1472/SD-SPI.o 
+	@${FIXDEPS} "${OBJECTDIR}/_ext/1472/SD-SPI.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION) -I"../../../../Microchip/Include" -DPIC32MX795F512L_PIM -I".." -I"../../Microchip/Include" -MMD -MF "${OBJECTDIR}/_ext/1472/SD-SPI.o.d" -o ${OBJECTDIR}/_ext/1472/SD-SPI.o ../SD-SPI.c    -DXPRJ_PIC32MX795F512L_PIM=$(CND_CONF)    $(COMPARISON_BUILD) 
+	
+${OBJECTDIR}/_ext/1472/DelayPIC32.o: ../DelayPIC32.c  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}/_ext/1472" 
+	@${RM} ${OBJECTDIR}/_ext/1472/DelayPIC32.o.d 
+	@${RM} ${OBJECTDIR}/_ext/1472/DelayPIC32.o 
+	@${FIXDEPS} "${OBJECTDIR}/_ext/1472/DelayPIC32.o.d" $(SILENT) -rsi ${MP_CC_DIR}../  -c ${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION) -I"../../../../Microchip/Include" -DPIC32MX795F512L_PIM -I".." -I"../../Microchip/Include" -MMD -MF "${OBJECTDIR}/_ext/1472/DelayPIC32.o.d" -o ${OBJECTDIR}/_ext/1472/DelayPIC32.o ../DelayPIC32.c    -DXPRJ_PIC32MX795F512L_PIM=$(CND_CONF)    $(COMPARISON_BUILD) 
 	
 endif
 

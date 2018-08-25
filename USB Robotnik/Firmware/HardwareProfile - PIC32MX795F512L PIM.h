@@ -6,26 +6,6 @@
  Compiler:      Microchip C32 (for PIC32)
  Company:       Microchip Technology, Inc.
 
- Software License Agreement:
-
- The software supplied herewith by Microchip Technology Incorporated
- (the �Company�) for its PIC� Microcontroller is intended and
- supplied to you, the Company�s customer, for use solely and
- exclusively on Microchip PIC Microcontroller products. The
- software is owned by the Company and/or its supplier, and is
- protected under applicable copyright laws. All rights are reserved.
- Any use in violation of the foregoing restrictions may subject the
- user to criminal sanctions under applicable laws, as well as to
- civil liability for the breach of the terms and conditions of this
- license.
-
- THIS SOFTWARE IS PROVIDED IN AN �AS IS� CONDITION. NO WARRANTIES,
- WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED
- TO, IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
- PARTICULAR PURPOSE APPLY TO THIS SOFTWARE. THE COMPANY SHALL NOT,
- IN ANY CIRCUMSTANCES, BE LIABLE FOR SPECIAL, INCIDENTAL OR
- CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.
-
 ********************************************************************
  File Description:
 
@@ -36,6 +16,7 @@
                      coding style
   2.3   09/15/2008   Broke out each hardware platform into its own
                      "HardwareProfile - xxx.h" file
+ Jim S 8-24-18: Added SPI definitions below to use SD card with UBW32 and SNAD PIC boards
 ********************************************************************/
 #define USE_UBW32_BOARD
 
@@ -88,22 +69,24 @@
     #if defined(RUN_AT_48MHZ)
         #define GetSystemClock()            48000000UL
         #define GetPeripheralClock()        48000000UL
-        #define GetInstructionClock()       (GetSystemClock() / 2) ???
+        #define GetInstructionClock()       (GetSystemClock() / 2)
     #elif defined(RUN_AT_24MHZ)
         #define GetSystemClock()            24000000UL
         #define GetPeripheralClock()        24000000UL
-        #define GetInstructionClock()       (GetSystemClock() / 2) ???
+        #define GetInstructionClock()       (GetSystemClock() / 2)
     #elif defined(RUN_AT_60MHZ)    
         #define GetSystemClock()            60000000UL
         #define GetPeripheralClock()        60000000UL  // Will be divided down
-        #define GetInstructionClock()       (GetSystemClock() / 2) ???
-    #else
+        #define GetInstructionClock()       (GetSystemClock() / 2)
+    #elif defined(RUN_AT_80MHZ)    
+        #define GetSystemClock()            (96000000ul)
+        #define GetPeripheralClock()        (GetSystemClock()/2) 
+        #define GetInstructionClock()       (GetSystemClock())
         #error Choose a speed
     #endif
 
     /** LED ************************************************************/
     // #define mInitAllLEDs()      LATA &= 0xFFC3; TRISA &= 0xFFC3;
-
 #ifdef USE_UBW32_BOARD
     #define mInitAllLEDs()      LATE &= 0xFFC0; TRISE &= 0xFFC0;    
 
