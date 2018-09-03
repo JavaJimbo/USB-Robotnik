@@ -9,7 +9,7 @@
 #ifndef DEFS_H
 #define	DEFS_H
 
-// #define USE_UBW32
+#define USE_UBW32
 
 /*
 #define	STX '>'
