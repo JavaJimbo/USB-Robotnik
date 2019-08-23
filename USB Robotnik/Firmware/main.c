@@ -1,4 +1,7 @@
 /**********************************************************************************
+ * PROJECT: USB ROBOTNIK
+ * Adapted to Brain Board
+ * 
  * FileName: main.c Adapted from Microchip CDC serial emulator
  * Compiled for PIC32MX795 XC32 compiler version 1.30
  * 
@@ -10,6 +13,7 @@
  * 9-3-18: Records and plays back MIDI on SD card. Uses serial MIDI UART on UBW32 board.
  * 8-19-19: Works nicely with VC++ Robotnik Controller at 961200 baud.
  *          Copied project to USB MIDI Robotnik, stripped all MIDI stuff.
+ * 8-23-19: DMA for TX: got rid of bugs - works great at 921600 baud
  ***********************************************************************************/
 #include <xc.h>
 #include "./USB/usb.h"
@@ -63,10 +67,20 @@
 #define HOSTbits U2STAbits
 #define HOST_VECTOR _UART_2_VECTOR
 
-#define MIDIuart UART1
-#define MIDIbits U1STAbits
-#define MIDI_VECTOR _UART_1_VECTOR
+#define RS485uart UART5
+#define RS485bits U5STAbits
+#define RS485_VECTOR _UART_5_VECTOR
 
+#define USE_RS485
+
+#ifdef USE_RS485  
+    #define UART_TX_REG U5TXREG
+    #define UART_TX_IRQ _UART5_TX_IRQ   
+    #define RS485_Control LATBbits.LATB0
+#else
+   #define UART_TX_REG U2TXREG
+   #define UART_TX_IRQ _UART2_TX_IRQ
+#endif
 
 #define CR 13
 #define LF 10
@@ -87,9 +101,15 @@ unsigned char HOSTRxBuffer[MAXBUFFER+1];
 unsigned char HOSTRxBufferFull = false;
 unsigned char HOSTTxBuffer[MAXBUFFER+1];
 unsigned char HOSTTxBufferFull = false;
+unsigned char RS485TxBuffer[MAXBUFFER+1] = "Starting RS485 TX Message\r";
+short RS485TxIndex = 0;
 unsigned char ADready = false;
 #define MAXPOTS 4
 unsigned int ADresult[MAXPOTS];
+
+DmaChannel	DmaUARTChannel = DMA_CHANNEL1;	// DMA channel to use for our example
+						// NOTE: the ISR setting has to match the channel number
+
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static void InitializeSystem(void);
@@ -103,9 +123,17 @@ void ConfigAd(void);
 
 int main(void)
 {   
+    unsigned char ch;
     InitializeSystem();
     DelayMs(100);
-    printf("\rTesting POTS\r");
+    
+        RS485TxIndex = 0;        
+        ch = RS485TxBuffer[RS485TxIndex++];
+        while (!UARTTransmitterIsReady(RS485uart));
+        UARTSendDataByte(RS485uart, ch);
+        INTEnable(INT_SOURCE_UART_TX(RS485uart), INT_ENABLED);
+        
+    printf("\rTesting UART DMA using UART 2\r");
     
     while(1)
     {
@@ -243,6 +271,9 @@ void InitializeSystem(void)
     
     ConfigAd();
     
+    PORTSetPinsDigitalOut(IOPORT_B, BIT_0);  // RB0 = RS485 control
+    RS485_Control = 1;
+    
     PORTSetPinsDigitalOut(IOPORT_E, BIT_3 | BIT_6);    // RE3 = TEST_OUT, RE6 = LED_OUT    
     TEST_OUT = 0;
     LED_OUT = 0;
@@ -264,9 +295,25 @@ void InitializeSystem(void)
 
     // Configure HOST UART Interrupts
     INTEnable(INT_SOURCE_UART_TX(HOSTuart), INT_DISABLED);
-    INTEnable(INT_SOURCE_UART_RX(HOSTuart), INT_ENABLED);
+    INTEnable(INT_SOURCE_UART_RX(HOSTuart), INT_DISABLED);
     INTSetVectorPriority(INT_VECTOR_UART(HOSTuart), INT_PRIORITY_LEVEL_2);
     INTSetVectorSubPriority(INT_VECTOR_UART(HOSTuart), INT_SUB_PRIORITY_LEVEL_0);
+        
+#ifdef USE_RS485    
+    // Set up RS485 UART    
+    UARTConfigure(RS485uart, UART_ENABLE_HIGH_SPEED | UART_ENABLE_PINS_TX_RX_ONLY);
+    UARTSetFifoMode(RS485uart, UART_INTERRUPT_ON_TX_DONE | UART_INTERRUPT_ON_RX_NOT_EMPTY);
+    UARTSetLineControl(RS485uart, UART_DATA_SIZE_8_BITS | UART_PARITY_NONE | UART_STOP_BITS_1);
+    UARTSetDataRate(RS485uart, SYS_FREQ, 921600);
+    // UARTSetDataRate(RS485uart, SYS_FREQ, 2000000);
+    UARTEnable(RS485uart, UART_ENABLE_FLAGS(UART_PERIPHERAL | UART_RX | UART_TX));
+
+    // Configure RS485 UART Interrupts
+    INTEnable(INT_SOURCE_UART_TX(RS485uart), INT_DISABLED);
+    INTEnable(INT_SOURCE_UART_RX(RS485uart), INT_DISABLED);
+    INTSetVectorPriority(INT_VECTOR_UART(RS485uart), INT_PRIORITY_LEVEL_2);
+    INTSetVectorSubPriority(INT_VECTOR_UART(RS485uart), INT_SUB_PRIORITY_LEVEL_0);  
+#endif        
 
     //PORTClearBits(IOPORT_B, BIT_3 | BIT_12 | BIT_13 | BIT_14 | BIT_15);
     //mPORTBSetPinsDigitalOut(BIT_0 | BIT_3 | BIT_12 | BIT_13 | BIT_14 | BIT_15);
@@ -281,9 +328,31 @@ void InitializeSystem(void)
     //mCNOpen(CN_ON, CN6_ENABLE | CN4_ENABLE, CN6_PULLUP_ENABLE | CN4_PULLUP_ENABLE);
     //ConfigIntCN(CHANGE_INT_ON | CHANGE_INT_PRI_2);
     
+    
+   	// now the TX part
+	// reconfigure the channel
+	DmaChnOpen(DmaUARTChannel, DMA_CHN_PRI2, DMA_OPEN_MATCH);
+    DmaChnSetMatchPattern(DmaUARTChannel, '\r');	// set \r as ending character    
+    
+	// set the events: now the start event is the UART tx being empty
+	// we maintain the pattern match mode
+	DmaChnSetEventControl(DmaUARTChannel, DMA_EV_START_IRQ_EN|DMA_EV_MATCH_EN|DMA_EV_START_IRQ(UART_TX_IRQ));
+	// set the transfer source and dest addresses, source and dest size and cell size     
+	DmaChnSetTxfer(DmaUARTChannel, RS485TxBuffer, (void*)&UART_TX_REG, 256, 1, 1);
+	DmaChnSetEvEnableFlags(DmaUARTChannel, DMA_EV_BLOCK_DONE);		// enable the transfer done interrupt: pattern match or all the characters transferred
+    
+	INTSetVectorPriority(INT_VECTOR_DMA(DmaUARTChannel), INT_PRIORITY_LEVEL_5);		// set INT controller priority
+	INTSetVectorSubPriority(INT_VECTOR_DMA(DmaUARTChannel), INT_SUB_PRIORITY_LEVEL_3);		// set INT controller sub-priority
+	INTEnable(INT_SOURCE_DMA(DmaUARTChannel), INT_ENABLED);		// enable the DmaUARTChannel interrupt in the INT controller    
+	
+	// DmaChnStartTxfer(DmaUARTChannel, DMA_WAIT_NOT, 0);	// force the DMA transfer: the UART2 tx flag it's already been active
+	
+	
+	// DMA Echo is complete
+	INTEnable(INT_SOURCE_DMA(DmaUARTChannel), INT_DISABLED);		// disable further interrupts from the DMA controller        
+    
     // Turn on the interrupts
     INTEnableSystemMultiVectoredInt();
-
 	// lastTransmission = 0;
 
     USBDeviceInit();	// Initializes USB module SFRs and firmware
@@ -291,7 +360,20 @@ void InitializeSystem(void)
 }//end UserInit
 
 
-
+// handler for the DMA channel 1 interrupt
+void __ISR(_DMA1_VECTOR, IPL5SOFT) DmaHandler1(void)
+{
+	int	evFlags;				// event flags when getting the interrupt
+	INTClearFlag(INT_SOURCE_DMA(DmaUARTChannel));	// release the interrupt in the INT controller, we're servicing int
+	evFlags = DmaChnGetEvFlags(DmaUARTChannel);	// get the event flags
+    if(evFlags & DMA_EV_BLOCK_DONE)
+    { 
+        // just a sanity check. we enabled just the DMA_EV_BLOCK_DONE transfer done interrupt
+        DmaChnClrEvFlags(DmaUARTChannel, DMA_EV_BLOCK_DONE);
+        // RS485TxBufferFull = false;
+        RS485TxBuffer[0] = '\0';
+    }
+}
 
 /******************************************************************************
  *	Change Notice Interrupt Service Routine
@@ -329,55 +411,6 @@ void __ISR(_CHANGE_NOTICE_VECTOR, ipl2) ChangeNotice_Handler(void) {
 
 
 
-// HOST UART interrupt handler it is set at priority level 2
-void __ISR(HOST_VECTOR, ipl2) IntHostUartHandler(void) {
-    unsigned char ch;
-    static unsigned short HOSTRxIndex = 0;
-    static unsigned char arrowIndex = 0;
-    static unsigned char arrArrow[3];
-    int i;
-
-    if (HOSTbits.OERR || HOSTbits.FERR) {
-        if (UARTReceivedDataIsAvailable(HOSTuart))
-            ch = UARTGetDataByte(HOSTuart);
-        HOSTbits.OERR = 0;
-        HOSTRxIndex = 0;
-    } else if (INTGetFlag(INT_SOURCE_UART_RX(HOSTuart))) {
-        INTClearFlag(INT_SOURCE_UART_RX(HOSTuart));
-        if (UARTReceivedDataIsAvailable(HOSTuart)) {
-            ch = UARTGetDataByte(HOSTuart);
-            {
-                if (ch == LF || ch == 0);
-                else if (ch == BACKSPACE) 
-                {
-                    while (!UARTTransmitterIsReady(HOSTuart));
-                    UARTSendDataByte(HOSTuart, ' ');
-                    while (!UARTTransmitterIsReady(HOSTuart));
-                    UARTSendDataByte(HOSTuart, BACKSPACE);
-                    if (HOSTRxIndex > 0) HOSTRxIndex--;
-                } 
-                else if (ch == CR) 
-                {
-                    if (HOSTRxIndex < (MAXBUFFER-1)) 
-                    {
-                        HOSTRxBuffer[HOSTRxIndex] = CR;
-                        HOSTRxBuffer[HOSTRxIndex + 1] = '\0'; 
-                        HOSTRxBufferFull = true;
-                    }
-                    HOSTRxIndex = 0;
-                }                
-                else 
-                {
-                    if (HOSTRxIndex < (MAXBUFFER-1))
-                        HOSTRxBuffer[HOSTRxIndex++] = ch;                    
-                }
-            }
-        }
-    }
-    if (INTGetFlag(INT_SOURCE_UART_TX(HOSTuart))) {
-        INTClearFlag(INT_SOURCE_UART_TX(HOSTuart));
-    }
-}
 
 
 void __ISR(_TIMER_2_VECTOR, ipl5) Timer2Handler(void) 
@@ -391,73 +424,6 @@ void __ISR(_TIMER_2_VECTOR, ipl5) Timer2Handler(void)
         milliCounter = 0;
     }
 }
-
-
-void ProcessIO(void)
-{   
-    static int bytesReceived = 0;     
-    int length, i;       
-    unsigned char TestBuffer[64];
-    static unsigned char USBreceived = false;
-    unsigned char USBReceivedData[64];    
-    
-    //Blink the LEDs according to the USB device status
-    
-    // User Application USB tasks
-    if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1)) 
-    {
-        LED_OUT = 0;
-        return;
-    }   
-    
-
-    // if (!HOSTTxBufferFull)
-    {
-        bytesReceived = getsUSBUSART(USBReceivedData, 64); //until the buffer is free.    
-        
-        if (bytesReceived > 0)
-        {	            
-            USBReceivedData[bytesReceived] = '\0';            
-            length = strlen(HOSTTxBuffer) + bytesReceived;            
-            if (length <= MAXBUFFER) strcat(HOSTTxBuffer, USBReceivedData);            
-            if (strchr(USBReceivedData, '\r')) 
-            {                
-                HOSTTxBufferFull = true;    
-                USBreceived = true;
-            }                
-        }	        
-    }
-    
-    if (USBreceived)
-    {
-        if (LED_OUT) LED_OUT = 0;
-        else LED_OUT = 1;
-        length = sprintf(TestBuffer, ">%d %d %d %d<\r", ADresult[0], ADresult[1], ADresult[2], ADresult[3]);
-        mAD1IntEnable(INT_ENABLED);
-    }
-
-    // Check if any bytes are waiting in the queue to send to the USB host.
-    // If any bytes are waiting, and the endpoint is available, prepare to
-    // send the USB packet to the host.
-    
-    if (USBUSARTIsTxTrfReady() && USBreceived)
-    {        
-        USBreceived = false;  
-        if (length < 64) putUSBUSART(TestBuffer, length);        		
-        else putUSBUSART("ERROR\r", 6);        
-	}
-    
-    if (HOSTTxBufferFull)
-    {
-        printf("%s", HOSTTxBuffer);
-        HOSTTxBuffer[0] = '\0';
-        HOSTTxBufferFull = false;
-    }
-    
-    CDCTxService();
-    
-}//end ProcessIO
-
 
 void ConfigAd(void) 
 {
@@ -524,5 +490,135 @@ void __ISR(_ADC_VECTOR, ipl6) ADHandler(void)
     for (i = 0; i < MAXPOTS; i++)
         ADresult[i] = (unsigned short) ReadADC10(offSet + i); // read the result of channel 0 conversion from the idle buffer
     ADready = true;
+}
+
+void ProcessIO(void)
+{   
+    static int bytesReceived = 0;     
+    int length, i;       
+    unsigned char USBReceivedData[64];  
+    static unsigned char USBRxBuffer[MAXBUFFER] = "\0";
+    static unsigned char USBBufferFull = false;
+    unsigned char ch;
+    unsigned char TestBuffer[64] = "";
+    
+    //Blink the LEDs according to the USB device status
+    
+    // User Application USB tasks
+    if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1)) 
+    {
+        LED_OUT = 0;
+        return;
+    }   
+    
+    bytesReceived = getsUSBUSART(USBReceivedData, 64); //until the buffer is free.            
+    if (bytesReceived > 0 && !USBBufferFull)
+    {	            
+        USBReceivedData[bytesReceived] = '\0';            
+        length = strlen(USBRxBuffer) + bytesReceived;            
+        if (length <= MAXBUFFER) strcat(USBRxBuffer, USBReceivedData);            
+        if (strchr(USBReceivedData, '\r')) USBBufferFull = true;    
+    }	      
+
+    // Check if any bytes are waiting in the queue to send to the USB host.
+    // If any bytes are waiting, and the endpoint is available, prepare to
+    // send the USB packet to the host.
+    
+    if (USBUSARTIsTxTrfReady() && USBBufferFull)
+    {        
+        if (LED_OUT) LED_OUT = 0;
+        else LED_OUT = 1;
+        length = sprintf(TestBuffer, ">%d %d %d %d<\r", ADresult[0], ADresult[1], ADresult[2], ADresult[3]);
+        mAD1IntEnable(INT_ENABLED);       
+        
+        if (length < 64) putUSBUSART(TestBuffer, length);        		
+        else putUSBUSART("ERROR\r", 6);        
+        
+        length = strlen(USBRxBuffer);
+        for (i = 0; i < length; i++) RS485TxBuffer[i] = USBRxBuffer[i];
+        USBRxBuffer[0] = '\0';
+        USBBufferFull = false;        
+        
+        DmaChnSetTxfer(DmaUARTChannel, RS485TxBuffer, (void*)&UART_TX_REG, 256, 1, 1);        
+        DmaChnStartTxfer(DmaUARTChannel, DMA_WAIT_NOT, 0);	// force the DMA transfer: the UART2 tx flag it's already been active       	        
+        
+        //RS485TxIndex = 0;        
+        //ch = RS485TxBuffer[RS485TxIndex++];
+        //while (!UARTTransmitterIsReady(RS485uart));
+        //UARTSendDataByte(RS485uart, ch);
+        //INTEnable(INT_SOURCE_UART_TX(RS485uart), INT_ENABLED);
+    }
+    
+    CDCTxService();
+    
+}//end ProcessIO
+
+
+// HOST UART interrupt handler it is set at priority level 2
+void __ISR(HOST_VECTOR, ipl2) IntHostUartHandler(void) {
+    unsigned char ch;
+    static unsigned short HOSTRxIndex = 0;
+    static unsigned char arrowIndex = 0;
+    static unsigned char arrArrow[3];
+    int i;
+
+    if (HOSTbits.OERR || HOSTbits.FERR) {
+        if (UARTReceivedDataIsAvailable(HOSTuart))
+            ch = UARTGetDataByte(HOSTuart);
+        HOSTbits.OERR = 0;
+        HOSTRxIndex = 0;
+    } else if (INTGetFlag(INT_SOURCE_UART_RX(HOSTuart))) {
+        INTClearFlag(INT_SOURCE_UART_RX(HOSTuart));
+        if (UARTReceivedDataIsAvailable(HOSTuart)) {
+            ch = UARTGetDataByte(HOSTuart);
+            {
+                if (ch == LF || ch == 0);
+                else if (ch == BACKSPACE) 
+                {
+                    while (!UARTTransmitterIsReady(HOSTuart));
+                    UARTSendDataByte(HOSTuart, ' ');
+                    while (!UARTTransmitterIsReady(HOSTuart));
+                    UARTSendDataByte(HOSTuart, BACKSPACE);
+                    if (HOSTRxIndex > 0) HOSTRxIndex--;
+                } 
+                else if (ch == CR) 
+                {
+                    if (HOSTRxIndex < (MAXBUFFER-1)) 
+                    {
+                        HOSTRxBuffer[HOSTRxIndex] = CR;
+                        HOSTRxBuffer[HOSTRxIndex + 1] = '\0'; 
+                        HOSTRxBufferFull = true;
+                    }
+                    HOSTRxIndex = 0;
+                }                
+                else 
+                {
+                    if (HOSTRxIndex < (MAXBUFFER-1))
+                        HOSTRxBuffer[HOSTRxIndex++] = ch;                    
+                }
+            }
+        }
+    }
+    if (INTGetFlag(INT_SOURCE_UART_TX(HOSTuart))) {
+        INTClearFlag(INT_SOURCE_UART_TX(HOSTuart));
+    }
+}
+
+// RS485 UART interrupt handler it is set at priority level 2
+void __ISR(RS485_VECTOR, ipl2) IntRS485UartHandler(void) {
+    unsigned char ch;
+
+   if (INTGetFlag(INT_SOURCE_UART_RX(RS485uart))) 
+        INTClearFlag(INT_SOURCE_UART_RX(RS485uart));
+        
+    if (INTGetFlag(INT_SOURCE_UART_TX(RS485uart))) 
+    {
+        INTClearFlag(INT_SOURCE_UART_TX(RS485uart));
+        ch = RS485TxBuffer[RS485TxIndex++];
+        while (!UARTTransmitterIsReady(RS485uart));
+        UARTSendDataByte(RS485uart, ch);
+        if (ch == '\r' || RS485TxIndex > MAXBUFFER) 
+            INTEnable(INT_SOURCE_UART_TX(RS485uart), INT_DISABLED);
+    }
 }
 
