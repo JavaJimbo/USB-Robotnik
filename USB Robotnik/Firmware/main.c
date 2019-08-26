@@ -14,6 +14,8 @@
  * 8-19-19: Works nicely with VC++ Robotnik Controller at 961200 baud.
  *          Copied project to USB MIDI Robotnik, stripped all MIDI stuff.
  * 8-23-19: DMA for TX: got rid of bugs - works great at 921600 baud
+ * 8-25-19: Works receiving/sending pot data from VC++ Robotnik Controller
+ * 8-26-19: Verified receiving/sending 100 servos.
  ***********************************************************************************/
 #include <xc.h>
 #include "./USB/usb.h"
@@ -112,6 +114,7 @@ DmaChannel	DmaUARTChannel = DMA_CHANNEL1;	// DMA channel to use for our example
 
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
+unsigned short decodePacket(unsigned char *ptrInPacket, unsigned char *ptrData);
 static void InitializeSystem(void);
 void ProcessIO(void);
 void USBDeviceTasks(void);
@@ -127,13 +130,14 @@ int main(void)
     InitializeSystem();
     DelayMs(100);
     
-        RS485TxIndex = 0;        
-        ch = RS485TxBuffer[RS485TxIndex++];
-        while (!UARTTransmitterIsReady(RS485uart));
-        UARTSendDataByte(RS485uart, ch);
-        INTEnable(INT_SOURCE_UART_TX(RS485uart), INT_ENABLED);
+    RS485TxIndex = 0;        
+    ch = RS485TxBuffer[RS485TxIndex++];
+    while (!UARTTransmitterIsReady(RS485uart));
+    UARTSendDataByte(RS485uart, ch);
+    
+    INTEnable(INT_SOURCE_UART_TX(RS485uart), INT_ENABLED);
         
-    printf("\rTesting UART DMA using UART 2\r");
+    printf("\r#2 Testing USB TX/RX and DMA TX using RS485\r");
     
     while(1)
     {
@@ -494,9 +498,10 @@ void __ISR(_ADC_VECTOR, ipl6) ADHandler(void)
 
 void ProcessIO(void)
 {   
-    static int bytesReceived = 0;     
-    int length, i;       
-    unsigned char USBReceivedData[64];  
+    int numBytes = 0;     
+    unsigned short length, i;     
+    static unsigned short packetLength = 0;
+    unsigned char USBNewRxBuffer[64];  
     static unsigned char USBRxBuffer[MAXBUFFER] = "\0";
     static unsigned char USBBufferFull = false;
     unsigned char ch;
@@ -511,31 +516,39 @@ void ProcessIO(void)
         return;
     }   
     
-    bytesReceived = getsUSBUSART(USBReceivedData, 64); //until the buffer is free.            
-    if (bytesReceived > 0 && !USBBufferFull)
-    {	            
-        USBReceivedData[bytesReceived] = '\0';            
-        length = strlen(USBRxBuffer) + bytesReceived;            
-        if (length <= MAXBUFFER) strcat(USBRxBuffer, USBReceivedData);            
-        if (strchr(USBReceivedData, '\r')) USBBufferFull = true;    
+    numBytes = getsUSBUSART(USBNewRxBuffer, 64); //until the buffer is free.            
+    if (numBytes > 0)
+    {	        
+        if (USBBufferFull) printf("\rOVERLAP ERROR");
+        for (i = 0; i < numBytes; i++)
+        {
+            ch = USBNewRxBuffer[i];
+            USBRxBuffer[i+packetLength] = ch;
+            if (ch == ETX) USBBufferFull = true;
+        }
+        packetLength = packetLength + numBytes;
+        if (USBBufferFull)
+        {
+            for (i = 0; i < packetLength; i++) RS485TxBuffer[i] = USBRxBuffer[i];
+            packetLength = 0;            
+        }        
     }	      
 
     // Check if any bytes are waiting in the queue to send to the USB host.
     // If any bytes are waiting, and the endpoint is available, prepare to
-    // send the USB packet to the host.
-    
+    // send the USB packet to the host.    
     if (USBUSARTIsTxTrfReady() && USBBufferFull)
     {        
         if (LED_OUT) LED_OUT = 0;
         else LED_OUT = 1;
-        length = sprintf(TestBuffer, ">%d %d %d %d<\r", ADresult[0], ADresult[1], ADresult[2], ADresult[3]);
+        length = sprintf(TestBuffer, ">0 %d %d %d %d\r", ADresult[0], ADresult[1], ADresult[2], ADresult[3]);
         mAD1IntEnable(INT_ENABLED);       
         
         if (length < 64) putUSBUSART(TestBuffer, length);        		
         else putUSBUSART("ERROR\r", 6);        
         
-        length = strlen(USBRxBuffer);
-        for (i = 0; i < length; i++) RS485TxBuffer[i] = USBRxBuffer[i];
+        //length = strlen(USBRxBuffer);
+        // for (i = 0; i < length; i++) RS485TxBuffer[i] = USBRxBuffer[i];
         USBRxBuffer[0] = '\0';
         USBBufferFull = false;        
         
@@ -622,3 +635,48 @@ void __ISR(RS485_VECTOR, ipl2) IntRS485UartHandler(void) {
     }
 }
 
+/*
+unsigned short decodePacket(unsigned char *ptrInPacket, unsigned char *ptrData) 
+{
+    unsigned short i, j;
+    unsigned char escapeFlag = FALSE;
+    unsigned char startFlag = false;
+    unsigned char ch;
+
+    j = 0;
+    for (i = 0; i < MAXBUFFER; i++) 
+    {
+        ch = ptrInPacket[i];
+        // Escape flag not active
+        if (!escapeFlag) 
+        {
+            if (ch == STX) 
+            {
+                if (!startFlag) 
+                {
+                    startFlag = true;
+                    j = 0;
+                }
+                else return (0);
+            } 
+            else if (ch == ETX) 
+                return (j);
+            else if (ch == DLE)
+                escapeFlag = TRUE;
+            else if (j < MAXBUFFER)
+                ptrData[j++] = ch;
+            else return (0);
+        } 
+        // Escape flag active
+        else 
+        {
+            escapeFlag = FALSE;
+            if (ch == ETX-1) ch = ETX;            
+            if (j < MAXBUFFER)
+                ptrData[j++] = ch;
+            else return(0);
+        }
+    }
+    return (j);
+}
+*/

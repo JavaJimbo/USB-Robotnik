@@ -11,10 +11,19 @@
 
 #define USE_UBW32
 
-/*
 #define	STX '>'
 #define	DLE '/'
 #define	ETX '\r'
+
+typedef union
+{
+	BYTE b[2];
+	UINT16 integer;
+} MConvertType;
+
+#define MAX_SERVOS 256
+
+/*
 
 #define NUMPOTS 4
 
