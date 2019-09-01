@@ -16,6 +16,7 @@
  * 8-23-19: DMA for TX: got rid of bugs - works great at 921600 baud
  * 8-25-19: Works receiving/sending pot data from VC++ Robotnik Controller
  * 8-26-19: Verified receiving/sending 100 servos.
+ * 9-1-19:  Works with Robotnik Brain Board and VC++ Robotnik Controller recording/playing four servo motors.
  ***********************************************************************************/
 #include <xc.h>
 #include "./USB/usb.h"

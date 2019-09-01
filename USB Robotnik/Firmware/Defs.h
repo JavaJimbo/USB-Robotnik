@@ -21,7 +21,7 @@ typedef union
 	UINT16 integer;
 } MConvertType;
 
-#define MAX_SERVOS 256
+#define MAX_SERVOS 64
 
 /*
 
